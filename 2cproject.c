@@ -430,7 +430,7 @@ int assembler() {
     FILE* input = fopen("input_jumps.fasm", "r");
     FILE* output = fopen("output.o", "w");
  
-    int 0;
+    int i = 0;
     char line[100];
     int mask = 255;
     unsigned int commandWithArgs;
@@ -462,15 +462,15 @@ int assembler() {
         fprintf(output, "%c%c%c%c", (commandWithArgs) & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
     }
     fseek(output, 0, SEEK_SET);
-    fprintf(output, "ThisIsFUPM2Exec\0"); // 16 byte
-    fprintf(output, "\0\0\0\0"); // 4 byte
-    fprintf(output, "\0\0\0\0"); // 4 byte
-    fprintf(output, "\0\0\0\0"); // 4 byte
+    fprintf(output, "ThisIsFUPM2Exec%c", '\0'); // 16 byte
+    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
     //4 byte
     fprintf(output, "%c%c%c%c", (startCommand) & mask, (startCommand >> 8) & mask, (startCommand >> 16) & mask, (startCommand >> 24) & mask);
-    fprintf(output, "\0\0\0\0"); // 4 byte
+    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
     for (i = 0; i < 476; i++)
-        fprintf(output, "\0"); // up to 512 byte
+        fprintf(output, "%c", '\0'); // up to 512 byte
     fclose(input);
     fclose(output);
     return 0;
@@ -511,14 +511,17 @@ int halt(unsigned un){
     exit(0);
 }
 int syscall(int r, int df){
+    int t = 1;
+    int k = 0;
+    char name[260];
+    void * buf;
+    int len;
     switch (df){
         case 0:
-            {fclose(inputs);
-            exit(reg[r]);}
+            fclose(inputs);
+            exit(reg[r]);
+            break;
         case 1:
-            {int t = 1;
-            int k = 0;
-            char name[260];
             while (t){
                 char c[4];
                 c[0] = (char)(stek[reg[14]-1] >> 24);
@@ -541,11 +544,32 @@ int syscall(int r, int df){
             reg[14]--;
             int file = open(name, mode, O_CREAT);
             reg[r] = file;
-        }
+            break;
         case 2:
-            {int t = 1;
-            int k = 0;
-            char name[260];
+            /*while (t){
+                char c[4];
+                c[0] = (char)((stek[reg[14]-1] >> 24));
+                c[1] = (char)((stek[reg[14]-1] >> 16) & 255);
+                c[2] = (char)((stek[reg[14]-1] >> 8)& 255);
+                c[3] = (char)((stek[reg[14]-1] & 255));
+                reg[14]--;
+                int i = 0;
+                while (c[i]!= '\0'){
+                    name[k+i] = c[i];
+                    i++;
+                }
+                if (c[i]== '\0'){
+                    name[k+i] = c[i];
+                    t = 0;
+                }
+                k += 4;
+            }
+            buf = (void *)(reg[r]);
+            len = stek[reg[14]-1];
+            reg[14]--;
+            read(name, buf, len);*/
+            break;
+        case 3:/*
             while (t){
                 char c[4];
                 c[0] = (char)((stek[reg[14]-1] >> 24));
@@ -564,48 +588,39 @@ int syscall(int r, int df){
                 }
                 k += 4;
             }
-            void * buf = (void *)(reg[r]);
-            int len = stek[reg[14]-1];
+            buf = (void *)(reg[r]);
+            len = stek[reg[14]-1];
             reg[14]--;
-            read(name, buf, len);}
-        case 3:
-            {int t = 1;
-            int k = 0;
-            char name[260];
-            while (t){
-                char c[4];
-                c[0] = (char)((stek[reg[14]-1] >> 24));
-                c[1] = (char)((stek[reg[14]-1] >> 16) & 255);
-                c[2] = (char)((stek[reg[14]-1] >> 8)& 255);
-                c[3] = (char)((stek[reg[14]-1] & 255));
-                reg[14]--;
-                int i = 0;
-                while (c[i]!= '\0'){
-                    name[k+i] = c[i];
-                    i++;
-                }
-                if (c[i]== '\0'){
-                    name[k+i] = c[i];
-                    t = 0;
-                }
-                k += 4;
-            }
-            void * buf = (void *)(reg[r]);
-            int len = stek[reg[14]-1];
-            reg[14]--;
-            write(name, buf, len);}
-        case 4: close(reg[r]);
-        case 5: {
-            int size = reg[r];
-            reg[r] = malloc(reg[r]);
-        }
-        case 6: free(&reg[r]);
-        case 100: scanf("%d", &reg[r]);
-        case 101: scanf("%d%d", &reg[r], &reg[r+1]);
-        case 102: printf("%d", reg[r]);
-        case 103: printf("%d%d", reg[r], reg[r+1]);
-        case 104: reg[r] = getchar();
-        case 105: putchar((char)(reg[r]));
+            write(name, buf, len);*/
+            break;
+        case 4: 
+            //close(reg[r]);
+            break;
+        case 5:
+            //int size = reg[r];
+            //reg[r] = malloc(reg[r]);
+            break;
+        case 6: 
+            free(&reg[r]);
+            break;
+        case 100: 
+            scanf("%d", &reg[r]);
+            break;
+        case 101: 
+            scanf("%d%d", &reg[r], &reg[r+1]);
+            break;
+        case 102: 
+            printf("%d", reg[r]);
+            break;
+        case 103: 
+            printf("%d%d", reg[r], reg[r+1]);
+            break;
+        case 104: 
+            reg[r] = getchar();
+            break;
+        case 105: 
+            putchar((char)(reg[r]));
+            break;
     }
     return 0;
 }
