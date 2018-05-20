@@ -531,8 +531,8 @@ int syscall_fupm(int r, int df){
     int t = 1;
     int k = 0;
     char name[260];
-    void * buf;
-    int len;
+    //void * buf;
+    //int len;
     switch (df){
         case 0:
             fclose(inputs);
@@ -928,7 +928,7 @@ int divd(int r, int l, int df){
         res +=(r_int/l_int);
     }
     if ((r_sign ^ l_sign)==1) r_sign =1;
-    reg[r]=(int)((r_sign << 31) + (r_deg << 21) + (((r_int & 2097151) >> 43)));
+    reg[r]=(int)((r_sign << 31) + ((r_deg - l_deg) << 21) + (((r_int & 2097151) >> 43)));
     reg[r + 1] =(int)(r_int >> 11);
     return 0;
 }
