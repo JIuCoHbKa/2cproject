@@ -430,13 +430,12 @@ int assembler() {
     FILE* input = fopen("input_jumps.fasm", "r");
     FILE* output = fopen("output.o", "w");
  
-    //fprintf(output, "ThisIsFUPM2Exec\0");
- 
- 
+    int 0;
     char line[100];
-    int mask;
+    int mask = 255;
     unsigned int commandWithArgs;
     fseek(output,512,SEEK_SET);
+    unsigned int startCommand = 0;
     while (fscanf(input, "%[^\n]\n", line) != EOF) {
         char command[10];
         enum code commandCode;
@@ -459,19 +458,19 @@ int assembler() {
                 commandWithArgs = bd(line);
                 break;
         }
-       
- 
- 
-        mask = 255;
  
         fprintf(output, "%c%c%c%c", (commandWithArgs) & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
     }
     fseek(output, 0, SEEK_SET);
-    fprintf(output, "ThisIsFUPM2Exec");
-    fprintf(output, "__No_matter__");
-    fprintf(output, "%c", (commandWithArgs & mask));
-    fprintf(output, "meoy");
-    fprintf(output, "My English hometask: The Caspian sea is the largest enclosed body of water on earthwhich can be classified as the largest drainless lake, or as a full-fledged sea. The length of the Caspian sea from North to South is about 1200 kilometers , from West to East — from 195 to 435 kilometers, an average of 310-320 kilometers. The Caspian sea washes the shores of five coastal countries: Kazakhstan, Iran, Turkmenistan, Russia, Azerbaijan. It is also really the third deepest lake");
+    fprintf(output, "ThisIsFUPM2Exec\0"); // 16 byte
+    fprintf(output, "\0\0\0\0"); // 4 byte
+    fprintf(output, "\0\0\0\0"); // 4 byte
+    fprintf(output, "\0\0\0\0"); // 4 byte
+    //4 byte
+    fprintf(output, "%c%c%c%c", (startCommand) & mask, (startCommand >> 8) & mask, (startCommand >> 16) & mask, (startCommand >> 24) & mask);
+    fprintf(output, "\0\0\0\0"); // 4 byte
+    for (i = 0; i < 476; i++)
+        fprintf(output, "\0"); // up to 512 byte
     fclose(input);
     fclose(output);
     return 0;
