@@ -446,7 +446,7 @@ int assembler() {
     int i = 0;
     char line[100];
     int mask = 255;
-    unsigned int commandWithArgs;
+    unsigned int commandWithArgs = 0;
     //fseek(output, 0L, SEEK_SET);
     fprintf(output, "ThisIsFUPM2Exec%c", '\0'); // 16 byte
     fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
@@ -485,7 +485,7 @@ int assembler() {
                 break;
         }
  
-        fprintf(output, "%c%c%c%c", (commandWithArgs) & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
+        fprintf(output, "%c%c%c%c", ((commandWithArgs) & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
     }
     
     fclose(input);
@@ -1188,13 +1188,18 @@ int storer2(int r1, int r2, int n){
     memory2[m_pointer] = n + reg[r2] + 1;
     return 0;
 }
+int halt(un){
+    fclose(inputs);
+    exit(reg[r]);
+}
+            
  
 int interpreter(){
     inputs = fopen("output.o", "r");
     char a, b, c, d;
-    int i, start;
+    int start;
     int r, l, df;
-    char* line[100];
+    //char* line[100];
     unsigned un;
     fseek(inputs, 28 ,SEEK_SET);
     fscanf(inputs, "%d", &start);
