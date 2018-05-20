@@ -3,7 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <sys/syscall.h>
+#include <unistd.h>
  
 FILE * inputs;
  
@@ -297,7 +297,7 @@ int labelsCount;
 int * stek;
 //r->body = calloc(sizeof(int), r->bodysize);
 //stek = calloc(sizeof(int), 1024);
- 
+unsigned int startCommand = 0;
 int clearAsm() {
     FILE* input = fopen("input.fasm", "r");
     FILE* inputJumps = fopen("input_jumps.fasm", "w");
@@ -322,7 +322,7 @@ int clearAsm() {
                 labels[labelsCount] = malloc(100 * sizeof(char));
                 strcpy(labels[labelsCount], commandStek);
                 if ((labelsCount % 10) == 0) {
-                    labelsNums = realloc(labelsNums, labelsCount + 10);
+                    labelsNums = (int*) realloc(labelsNums, (labelsCount + 10) * sizeof(int));
                 }
                 labelsNums[labelsCount] = lineNum - labelsCount;
                 labelsCount++;
@@ -353,6 +353,8 @@ int clearAsm() {
                     for (j = 0; j < labelsCount; j++) {
                         if (!strcmp(labels[j], second)) {
                             fprintf(inputJumps, "%s %d\n", command, labelsNums[j]);
+                            if (!strcmp(command, "end"))
+                                startCommand = labelsNums[j];
                             break;
                         }
                     }
@@ -436,15 +438,26 @@ unsigned int end_command (char* line) {
 } 
  
 int assembler() {
-    FILE* input = fopen("input_jumps.fasm", "r");
-    FILE* output = fopen("output.o", "w");
+    FILE* input;
+    FILE* output;
+    input = fopen("input_jumps.fasm", "r");
+    output = fopen("output.o", "w");
  
     int i = 0;
     char line[100];
     int mask = 255;
     unsigned int commandWithArgs;
-    fseek(output,512,SEEK_SET);
-    unsigned int startCommand = 0;
+    //fseek(output, 0L, SEEK_SET);
+    fprintf(output, "ThisIsFUPM2Exec%c", '\0'); // 16 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    //4 byte
+    fprintf(output, "%c%c%c%c", (startCommand) & mask, (startCommand >> 8) & mask, (startCommand >> 16) & mask, (startCommand >> 24) & mask);
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    for (i = 0; i < 476; i++)
+        fprintf(output, "%c", '\0'); // up to 512 byte
+    //fseek(output, 512L, SEEK_SET);
     while (fscanf(input, "%[^\n]\n", line) != EOF) {
         char command[10];
         enum code commandCode;
@@ -474,23 +487,14 @@ int assembler() {
  
         fprintf(output, "%c%c%c%c", (commandWithArgs) & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
     }
-    fseek(output, 0, SEEK_SET);
-    fprintf(output, "ThisIsFUPM2Exec%c", '\0'); // 16 byte
-    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
-    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
-    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
-    //4 byte
-    fprintf(output, "%c%c%c%c", (startCommand) & mask, (startCommand >> 8) & mask, (startCommand >> 16) & mask, (startCommand >> 24) & mask);
-    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
-    for (i = 0; i < 476; i++)
-        fprintf(output, "%c", '\0'); // up to 512 byte
+    
     fclose(input);
     fclose(output);
     return 0;
 }
  
  
-int reg[17]={0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int reg[17];
 int * memory;
 int * memory2;
 int m_pointer = 0;
@@ -523,7 +527,7 @@ int halt(unsigned un){
     fclose(inputs);
     exit(0);
 }
-int syscall(int r, int df){
+int syscall_fupm(int r, int df){
     int t = 1;
     int k = 0;
     char name[260];
@@ -537,7 +541,7 @@ int syscall(int r, int df){
         case 1:
             while (t){
                 char c[4];
-                c[0] = (char)(stek[reg[14]-1] >> 24);
+                c[0] = (char) (stek[reg[14]-1] >> 24);
                 c[1] = (char)((stek[reg[14]-1] >> 16) & 255);
                 c[2] = (char)((stek[reg[14]-1] >> 8)& 255);
                 c[3] = (char)((stek[reg[14]-1] & 255));
@@ -1185,8 +1189,7 @@ int storer2(int r1, int r2, int n){
     return 0;
 }
  
- 
-int translitter(){
+int interpreter(){
     inputs = fopen("output.o", "r");
     char a, b, c, d;
     int i, start;
@@ -1205,7 +1208,7 @@ int translitter(){
                 break;
             case SYSCALL:
                 trans_ri(a, b, c, r, df);
-                syscall(r, df);
+                syscall_fupm(r, df);
                 break;
             case ADD:
                 trans_rr(a, b, c, r, l, df);
@@ -1417,13 +1420,17 @@ int translitter(){
 }
  
 int main(){
+    int i;
+    for (i = 0; i < 17; i++) {
+        reg[i] = 0;
+    }
     stek = malloc(sizeof(int) * 1024);
     memory = malloc(sizeof(int) * 622144);
     memory2 = malloc(sizeof(int) * 622144);
     commandstek = malloc(sizeof(int) * 1024);
     clearAsm();
     assembler();
-    translitter();
+    interpreter();
     free(stek);
     free(memory);
     free(commandstek);
