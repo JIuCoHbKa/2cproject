@@ -3,7 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <sys/syscall.h>
+#include <unistd.h>
  
 FILE * inputs;
  
@@ -59,7 +59,7 @@ enum code {
     LOADR = 68,
     LOADR2 = 69,
     STORER = 70,
-    STORER2 = 71
+    STORER2 = 71,
 };
  
 enum type {
@@ -227,6 +227,9 @@ enum code getCommandCode (char* commandName) {
     if (!strcmp(commandName, "storer2")) {
         command = 71;
     }
+    if (!strcmp(commandName, "end")) {
+        command = 99;
+    }
     return command;
 }
  
@@ -294,7 +297,7 @@ int labelsCount;
 int * stek;
 //r->body = calloc(sizeof(int), r->bodysize);
 //stek = calloc(sizeof(int), 1024);
- 
+unsigned int startCommand = 0;
 int clearAsm() {
     FILE* input = fopen("input.fasm", "r");
     FILE* inputJumps = fopen("input_jumps.fasm", "w");
@@ -319,7 +322,7 @@ int clearAsm() {
                 labels[labelsCount] = malloc(100 * sizeof(char));
                 strcpy(labels[labelsCount], commandStek);
                 if ((labelsCount % 10) == 0) {
-                    labelsNums = realloc(labelsNums, labelsCount + 10);
+                    labelsNums = (int*) realloc(labelsNums, (labelsCount + 10) * sizeof(int));
                 }
                 labelsNums[labelsCount] = lineNum - labelsCount;
                 labelsCount++;
@@ -350,6 +353,8 @@ int clearAsm() {
                     for (j = 0; j < labelsCount; j++) {
                         if (!strcmp(labels[j], second)) {
                             fprintf(inputJumps, "%s %d\n", command, labelsNums[j]);
+                            if (!strcmp(command, "end"))
+                                startCommand = labelsNums[j];
                             break;
                         }
                     }
@@ -411,7 +416,7 @@ unsigned int rm(char* line) {
     free(command);
     return res;
 }
-unsigned int bd(char* line) {
+unsigned int bd (char* line) {
     char* command;
     int num;
  
@@ -423,20 +428,36 @@ unsigned int bd(char* line) {
     free(command);
     return res;
 }
+
+unsigned int end_command (char* line) {
+    char* command;
+    int num;
  
- 
+    sscanf (line, "%ms %u", &command, &num);
+    return num;
+} 
  
 int assembler() {
-    FILE* input = fopen("input_jumps.fasm", "r");
-    FILE* output = fopen("output.o", "w");
+    FILE* input;
+    FILE* output;
+    input = fopen("input_jumps.fasm", "r");
+    output = fopen("output.o", "w");
  
-    //fprintf(output, "ThisIsFUPM2Exec\0");
- 
- 
+    int i = 0;
     char line[100];
-    int mask;
+    int mask = 255;
     unsigned int commandWithArgs;
-    fseek(output,512,SEEK_SET);
+    //fseek(output, 0L, SEEK_SET);
+    fprintf(output, "ThisIsFUPM2Exec%c", '\0'); // 16 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    //4 byte
+    fprintf(output, "%c%c%c%c", (startCommand) & mask, (startCommand >> 8) & mask, (startCommand >> 16) & mask, (startCommand >> 24) & mask);
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    for (i = 0; i < 476; i++)
+        fprintf(output, "%c", '\0'); // up to 512 byte
+    //fseek(output, 512L, SEEK_SET);
     while (fscanf(input, "%[^\n]\n", line) != EOF) {
         char command[10];
         enum code commandCode;
@@ -445,6 +466,10 @@ int assembler() {
         sscanf(line, "%s", command);
         commandCode = getCommandCode(command);
         commandType = getCommandType(commandCode);
+        if (commandCode == 99) {
+            startCommand = end_command(line);
+            continue;
+        }
         switch (commandType) {
             case RI:
                 commandWithArgs = ri(line);
@@ -459,26 +484,17 @@ int assembler() {
                 commandWithArgs = bd(line);
                 break;
         }
-       
- 
- 
-        mask = 255;
  
         fprintf(output, "%c%c%c%c", (commandWithArgs) & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
     }
-    fseek(output, 0, SEEK_SET);
-    fprintf(output, "ThisIsFUPM2Exec");
-    fprintf(output, "__No_matter__");
-    fprintf(output, "%c", (commandWithArgs & mask));
-    fprintf(output, "meoy");
-    fprintf(output, "My English hometask: The Caspian sea is the largest enclosed body of water on earthwhich can be classified as the largest drainless lake, or as a full-fledged sea. The length of the Caspian sea from North to South is about 1200 kilometers , from West to East — from 195 to 435 kilometers, an average of 310-320 kilometers. The Caspian sea washes the shores of five coastal countries: Kazakhstan, Iran, Turkmenistan, Russia, Azerbaijan. It is also really the third deepest lake");
+    
     fclose(input);
     fclose(output);
     return 0;
 }
  
  
-int reg[17]={0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int reg[17];
 int * memory;
 int * memory2;
 int m_pointer = 0;
@@ -511,18 +527,21 @@ int halt(unsigned un){
     fclose(inputs);
     exit(0);
 }
-int syscall(int r, int df){
+int syscall_fupm(int r, int df){
+    int t = 1;
+    int k = 0;
+    char name[260];
+    void * buf;
+    int len;
     switch (df){
         case 0:
-            {fclose(inputs);
-            exit(reg[r]);}
+            fclose(inputs);
+            exit(reg[r]);
+            break;
         case 1:
-            {int t = 1;
-            int k = 0;
-            char name[260];
             while (t){
                 char c[4];
-                c[0] = (char)(stek[reg[14]-1] >> 24);
+                c[0] = (char) (stek[reg[14]-1] >> 24);
                 c[1] = (char)((stek[reg[14]-1] >> 16) & 255);
                 c[2] = (char)((stek[reg[14]-1] >> 8)& 255);
                 c[3] = (char)((stek[reg[14]-1] & 255));
@@ -542,11 +561,32 @@ int syscall(int r, int df){
             reg[14]--;
             int file = open(name, mode, O_CREAT);
             reg[r] = file;
-        }
+            break;
         case 2:
-            {int t = 1;
-            int k = 0;
-            char name[260];
+            /*while (t){
+                char c[4];
+                c[0] = (char)((stek[reg[14]-1] >> 24));
+                c[1] = (char)((stek[reg[14]-1] >> 16) & 255);
+                c[2] = (char)((stek[reg[14]-1] >> 8)& 255);
+                c[3] = (char)((stek[reg[14]-1] & 255));
+                reg[14]--;
+                int i = 0;
+                while (c[i]!= '\0'){
+                    name[k+i] = c[i];
+                    i++;
+                }
+                if (c[i]== '\0'){
+                    name[k+i] = c[i];
+                    t = 0;
+                }
+                k += 4;
+            }
+            buf = (void *)(reg[r]);
+            len = stek[reg[14]-1];
+            reg[14]--;
+            read(name, buf, len);*/
+            break;
+        case 3:/*
             while (t){
                 char c[4];
                 c[0] = (char)((stek[reg[14]-1] >> 24));
@@ -565,48 +605,39 @@ int syscall(int r, int df){
                 }
                 k += 4;
             }
-            void * buf = (void *)(reg[r]);
-            int len = stek[reg[14]-1];
+            buf = (void *)(reg[r]);
+            len = stek[reg[14]-1];
             reg[14]--;
-            read(name, buf, len);}
-        case 3:
-            {int t = 1;
-            int k = 0;
-            char name[260];
-            while (t){
-                char c[4];
-                c[0] = (char)((stek[reg[14]-1] >> 24));
-                c[1] = (char)((stek[reg[14]-1] >> 16) & 255);
-                c[2] = (char)((stek[reg[14]-1] >> 8)& 255);
-                c[3] = (char)((stek[reg[14]-1] & 255));
-                reg[14]--;
-                int i = 0;
-                while (c[i]!= '\0'){
-                    name[k+i] = c[i];
-                    i++;
-                }
-                if (c[i]== '\0'){
-                    name[k+i] = c[i];
-                    t = 0;
-                }
-                k += 4;
-            }
-            void * buf = (void *)(reg[r]);
-            int len = stek[reg[14]-1];
-            reg[14]--;
-            write(name, buf, len);}
-        case 4: close(reg[r]);
-        case 5: {
-            int size = reg[r];
-            reg[r] = malloc(reg[r]);
-        }
-        case 6: free(&reg[r]);
-        case 100: scanf("%d", &reg[r]);
-        case 101: scanf("%d%d", &reg[r], &reg[r+1]);
-        case 102: printf("%d", reg[r]);
-        case 103: printf("%d%d", reg[r], reg[r+1]);
-        case 104: reg[r] = getchar();
-        case 105: putchar((char)(reg[r]));
+            write(name, buf, len);*/
+            break;
+        case 4: 
+            //close(reg[r]);
+            break;
+        case 5:
+            //int size = reg[r];
+            //reg[r] = malloc(reg[r]);
+            break;
+        case 6: 
+            free(&reg[r]);
+            break;
+        case 100: 
+            scanf("%d", &reg[r]);
+            break;
+        case 101: 
+            scanf("%d%d", &reg[r], &reg[r+1]);
+            break;
+        case 102: 
+            printf("%d", reg[r]);
+            break;
+        case 103: 
+            printf("%d%d", reg[r], reg[r+1]);
+            break;
+        case 104: 
+            reg[r] = getchar();
+            break;
+        case 105: 
+            putchar((char)(reg[r]));
+            break;
     }
     return 0;
 }
@@ -1158,8 +1189,7 @@ int storer2(int r1, int r2, int n){
     return 0;
 }
  
- 
-int translitter(){
+int interpreter(){
     inputs = fopen("output.o", "r");
     char a, b, c, d;
     int i, start;
@@ -1178,7 +1208,7 @@ int translitter(){
                 break;
             case SYSCALL:
                 trans_ri(a, b, c, r, df);
-                syscall(r, df);
+                syscall_fupm(r, df);
                 break;
             case ADD:
                 trans_rr(a, b, c, r, l, df);
@@ -1390,13 +1420,17 @@ int translitter(){
 }
  
 int main(){
+    int i;
+    for (i = 0; i < 17; i++) {
+        reg[i] = 0;
+    }
     stek = malloc(sizeof(int) * 1024);
     memory = malloc(sizeof(int) * 622144);
     memory2 = malloc(sizeof(int) * 622144);
     commandstek = malloc(sizeof(int) * 1024);
     clearAsm();
     assembler();
-    translitter();
+    interpreter();
     free(stek);
     free(memory);
     free(commandstek);
