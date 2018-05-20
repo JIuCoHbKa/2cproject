@@ -435,7 +435,7 @@ unsigned int end_command (char* line) {
  
     sscanf (line, "%ms %u", &command, &num);
     return num;
-} 
+}
  
 int assembler() {
     FILE* input;
@@ -485,7 +485,7 @@ int assembler() {
                 break;
         }
  
-        fprintf(output, "%c%c%c%c", ((commandWithArgs) & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
+        fprintf(output, "%c%c%c%c", commandWithArgs & mask, (commandWithArgs >> 8) & mask, (commandWithArgs >> 16) & mask, (commandWithArgs >> 24) & mask);
     }
     
     fclose(input);
@@ -500,26 +500,27 @@ int * memory2;
 int m_pointer = 0;
 //int * stek;
  
-int trans_ri(char a, char b, char c, int r, int df){
-    r = (c & 240);
-    df = ((c & 15) << 16) + (b << 8) + a;
+int trans_ri(char a, char b, char c, int* r, int* df){
+    *r = (c & 240);
+    *df = ((c & 15) << 16) + (b << 8) + a;
     return 0;
  
 }
-;
-int trans_rr(char a, char b, char c, int r, int l, int df){
-    r = (c & 240);
-    l = (c & 15);
-    df = (b << 8) + a;
+
+int trans_rr(char a, char b, char c, int* r, int* l, int* df){
+    *r = (c & 240) >> 4;
+    *l = (c & 15);
+    *df = (b << 8) + a;
+    //printf("%d %d %d\n", *r, *l, *df);
     return 0;
 }
-int trans_rm(char a, char b, char c, int r, unsigned un){
-    r = (c & 240);
-    un = ((c&15)  << 16) + (b << 8) + a;
+int trans_rm(char a, char b, char c, int* r, unsigned* un){
+    *r = (c & 240);
+    *un = ((c&15)  << 16) + (b << 8) + a;
     return 0;
 }
-int trans_bd(char a, char b, char c, unsigned un){
-    un = (c << 16) + (b << 8) + a;
+int trans_bd(char a, char b, char c, unsigned* un){
+    *un = (c << 16) + (b << 8) + a;
     return 0;
  
 }
@@ -638,6 +639,8 @@ int syscall_fupm(int r, int df){
         case 105: 
             putchar((char)(reg[r]));
             break;
+        default:
+            break;
     }
     return 0;
 }
@@ -742,8 +745,8 @@ int not(int r, int df){
     return 0;
 }
 int mov(int r, int l, int df){
-    int res = reg[l] + df;
-    reg[r] = (int)(res);
+    reg[r] = reg[l] + df;
+    //printf("%d %d %d\n", r, l, df);
     return 0;
 }
 int addd(int r, int l, int df){
@@ -1187,13 +1190,18 @@ int storer2(int r1, int r2, int n){
     memory[m_pointer] = reg[r1 + 1];
     memory2[m_pointer] = n + reg[r2] + 1;
     return 0;
+}            
+
+int debug () {
+    int i;
+    printf("regs: ");
+    for (i = 0; i < 17; i++) {
+        printf("%d ", reg[i]);
+    }
+    printf("\n");
 }
-int halt(un){
-    fclose(inputs);
-    exit(reg[r]);
-}
-            
- 
+
+
 int interpreter(){
     inputs = fopen("output.o", "r");
     char a, b, c, d;
@@ -1202,228 +1210,232 @@ int interpreter(){
     //char* line[100];
     unsigned un;
     fseek(inputs, 28 ,SEEK_SET);
-    fscanf(inputs, "%d", &start);
+    fscanf(inputs, "%c%c%c%c", &a, &b, &c, &d);
+    start = (d << 24) + (c << 16) + (b << 8) + a;
     fseek(inputs, 512 + (start * 4), SEEK_SET);
+    //debug();
     while(fscanf(inputs,"%c%c%c%c", &a, &b, &c, &d) != EOF) {
         kolya = 1;
         switch(d){
             case HALT:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 halt(un);
                 break;
             case SYSCALL:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 syscall_fupm(r, df);
                 break;
             case ADD:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 add(r, l, df);
                 break;
             case ADDI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 addi(r, df);
                 break;
             case SUB:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 sub(r, l, df);
                 break;
             case SUBI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 subi(r, df);
                 break;
             case MUL:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 mul(r, l, df);
                 break;
             case MULI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 muli(r, df);
                 break;
             case DIV:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 divn(r, l, df);
                 break;
             case DIVI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 divi(r, df);
                 break;
             case LC:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 lc(r, df);
                 break;
             case SHL:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 shl(r, l, df);
                 break;
             case SHLI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 shli(r, df);
                 break;
             case SHR:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 shr(r, l, df);
                 break;
             case SHRI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 shri(r, df);
                 break;
             case AND:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 and(r, l, df);
                 break;
             case ANDI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r, &df);
                 andi(r, df);
                 break;
             case OR:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 or(r, l, df);
                 break;
             case ORI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r,&df);
                 ori(r, df);
                 break;
             case XOR:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 xor(r, l, df);
                 break;
             case XORI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r,&df);
                 xori(r, df);
                 break;
             case NOT:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r,&df);
                 not(r, df);
                 break;
             case MOV:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 mov(r, l, df);
                 break;
             case ADDD:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 addd(r, l, df);
                 break;
             case SUBD:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 subd(r, l, df);
                 break;
             case MULD:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 muld(r, l, df);
                 break;
             case DIVD:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 divd(r, l, df);
                 break;
             case ITOD:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 itod(r, l, df);
                 break;
             case DTOI:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 dtoi(r, l, df);
                 break;
             case PUSH:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r,&df);
                 push(r, df);
                 break;
             case POP:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r,&df);
                 pop(r, df);
                 break;
             case CALL:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 call(r, l, df);
                 break;
             case CALLI:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 calli(un);
                 break;
             case RET:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 ret(un);
                 break;
             case CMP:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 cmp(r, l, df);
                 break;
             case CMPI:
-                trans_ri(a, b, c, r, df);
+                trans_ri(a, b, c, &r,&df);
                 cmpi(r, df);
                 break;
             case CMPD:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r,&l, &df);
                 cmpd(r, l, df);
                 break;
             case JMP:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 jmp(un);
                 break;
             case JNE:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 jne(un);
                 break;
             case JEQ:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 jeq(un);
                 break;
             case JLE:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 jle(un);
                 break;
             case JL:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 jl(un);
                 break;
             case JGE:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 jge(un);
                 break;
             case JG:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 jg(un);
                 break;
             case LOAD:
-                trans_rm(a, b, c, r, un);
+                trans_rm(a, b, c, &r, &un);
                 load(r, un);
                 break;
             case STORE:
-                trans_rm(a, b, c, r, un);
+                trans_rm(a, b, c, &r, &un);
                 store(r, un);
                 break;
             case LOAD2:
-                trans_rm(a, b, c, r, un);
+                trans_rm(a, b, c, &r, &un);
                 load2(r, un);
                 break;
             case STORE2:
-                trans_ri(a, b, c, r, un);
+                trans_ri(a, b, c, &r, &un);
                 store2(r, un);
                 break;
             case LOADR:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 loadr(r, l, df);
                 break;
             case LOADR2:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 loadr2(r, l, df);
                 break;
             case STORER:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 storer(r, l, df);
                 break;
             case STORER2:
-                trans_rr(a, b, c, r, l, df);
+                trans_rr(a, b, c, &r, &l, &df);
                 storer2(r, l, df);
                 break;
             default:
-                trans_bd(a, b, c, un);
+                trans_bd(a, b, c, &un);
                 break;
         }
-        fseek(inputs, kolya*4, SEEK_CUR);
+        //debug();
+        //fseek(inputs, kolya*4, SEEK_CUR);
     }
     return 0;
 }
- 
+
+
 int main(){
     int i;
     for (i = 0; i < 17; i++) {
@@ -1438,6 +1450,7 @@ int main(){
     interpreter();
     free(stek);
     free(memory);
+    free(memory2);
     free(commandstek);
     return 0;
 }
