@@ -59,7 +59,7 @@ enum code {
     LOADR = 68,
     LOADR2 = 69,
     STORER = 70,
-    STORER2 = 71,
+    STORER2 = 71
 };
  
 enum type {
