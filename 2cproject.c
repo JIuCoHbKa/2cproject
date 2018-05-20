@@ -59,7 +59,7 @@ enum code {
     LOADR = 68,
     LOADR2 = 69,
     STORER = 70,
-    STORER2 = 71
+    STORER2 = 71,
 };
  
 enum type {
@@ -226,6 +226,9 @@ enum code getCommandCode (char* commandName) {
     }
     if (!strcmp(commandName, "storer2")) {
         command = 71;
+    }
+    if (!strcmp(commandName, "end")) {
+        command = 99;
     }
     return command;
 }
@@ -411,7 +414,7 @@ unsigned int rm(char* line) {
     free(command);
     return res;
 }
-unsigned int bd(char* line) {
+unsigned int bd (char* line) {
     char* command;
     int num;
  
@@ -423,8 +426,14 @@ unsigned int bd(char* line) {
     free(command);
     return res;
 }
+
+unsigned int end_command (char* line) {
+    char* command;
+    int num;
  
- 
+    sscanf (line, "%ms %u", &command, &num);
+    return num;
+} 
  
 int assembler() {
     FILE* input = fopen("input_jumps.fasm", "r");
@@ -444,6 +453,10 @@ int assembler() {
         sscanf(line, "%s", command);
         commandCode = getCommandCode(command);
         commandType = getCommandType(commandCode);
+        if (commandCode == 99) {
+            startCommand = end_command(line);
+            continue;
+        }
         switch (commandType) {
             case RI:
                 commandWithArgs = ri(line);
@@ -463,12 +476,12 @@ int assembler() {
     }
     fseek(output, 0, SEEK_SET);
     fprintf(output, "ThisIsFUPM2Exec%c", '\0'); // 16 byte
-    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
-    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
-    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
     //4 byte
     fprintf(output, "%c%c%c%c", (startCommand) & mask, (startCommand >> 8) & mask, (startCommand >> 16) & mask, (startCommand >> 24) & mask);
-    fprintf(output, "%c%c%c%c", '\0', '\0', '\0', '\0'); // 4 byte
+    fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
     for (i = 0; i < 476; i++)
         fprintf(output, "%c", '\0'); // up to 512 byte
     fclose(input);
