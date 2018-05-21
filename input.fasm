@@ -1,10 +1,24 @@
+fact:
+    loadr r0 r14 1
+    cmpi r0 1
+    jg skip0
+    lc r0 1
+    ret 1
+skip0:
+    push r0 0
+    subi r0 1
+    push r0 0
+    calli fact
+    pop r2 0
+    mul r0 r2 0
+    ret 1
 main:
-	syscall r0 100  ;ввод числа со стандартного ввода в регистр r0
-	mov r2 r0 0     ;копирование регистра r0 в регистр r2
-	mul r0 r2 0     ;пара регистров (r0,r1) содержит произведение
-	syscall r0 102  ;вывод содержимого регистра r0 (младшая часть)
-	lc r0 10        ;загрузка константы 10 (’\n’) в регистр r0
-	syscall r0 105  ;вывод ’\n’
-	lc r0 0         ;
-	syscall r0 0    ;выход из программы с кодом 0
-	end main        ;начать исполнение с main
+    lc r0 4
+    push r0 0
+    calli fact
+    syscall r0 102
+    lc r0 10
+    syscall r0 105
+    lc r0 0
+    syscall r0 0
+    end main

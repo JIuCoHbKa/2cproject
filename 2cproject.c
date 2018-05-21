@@ -619,7 +619,7 @@ int syscall_fupm(int r, int df){
             //reg[r] = malloc(reg[r]);
             break;
         case 6: 
-            free(&reg[r]);
+            //free(&reg[r]);
             break;
         case 100: 
             scanf("%d", &reg[r]);
@@ -941,7 +941,8 @@ int divd(int r, int l, int df){
 /*int **///commandstek = malloc(sizeof(int) * 1024);
 int * commandstek;
 int CommandStekNumber = 0;
- 
+int jumpPoint = -1;
+
 int itod(int r, int l, int n){
     int r_sign;
     if (reg[r]< 0) r_sign = 1;
@@ -975,39 +976,37 @@ int dtoi(int r, int l, int n){
  
 int push(int r, int n){
     stek[reg[14]] = reg[r] + n;
-    reg[14] ++;
+    reg[14]++;
     return 0;
 }
  
 int pop(int r, int n){
     if (reg[14]<=0) return 1;
     reg[r] = stek[reg[14]-1] + n;
-    reg[14] --;
+    reg[14]--;
     return 0;
 }
  
-int kolya = 1;
- 
 int call(int r, int l, int n){
-    kolya = 0;
     commandstek[CommandStekNumber] = reg[15];
-    CommandStekNumber ++;
+    CommandStekNumber++;
     reg[r] = reg[15];
     reg[15] = reg[l] + n;
+    jumpPoint = reg[15];
     return 0;
 }
  
 int calli(unsigned int n){
-    kolya = 0;
     commandstek[CommandStekNumber] = reg[15];
-    CommandStekNumber ++;
+    CommandStekNumber++;
     reg[15] = n;
+    jumpPoint = n;
     return 0;
 }
  
 int ret(unsigned int n){
-    kolya = 0;
     reg[15] = commandstek[CommandStekNumber - 1] + n;
+    jumpPoint = reg[15];
     return 0;
 }
  
@@ -1075,15 +1074,15 @@ int cmpd(int r, int l, int df){
     return 0;
 }
 int jmp(unsigned int n){
-    kolya = 0;
     reg[15] = n;
+    jumpPoint = n;
     return 0;
 }
  
 int jne(unsigned int n){
     if ((reg[16] & 8) == 0){
         reg[15] = n;
-        kolya = 0;
+        jumpPoint = n;
     }
     return 0;
 }
@@ -1091,7 +1090,7 @@ int jne(unsigned int n){
 int jeq(unsigned int n){
     if ((reg[16] & 8) == 8){
         reg[15] = n;
-        kolya = 0;
+        jumpPoint = n;
     }
     return 0;  
 }
@@ -1099,7 +1098,7 @@ int jeq(unsigned int n){
 int jle(unsigned int n){
     if (((reg[16] & 8) == 8) || ((reg[16] & 16) == 16)){
         reg[15] = n;
-        kolya = 0;
+        jumpPoint = n;
     }
     return 0;
 }
@@ -1107,7 +1106,7 @@ int jle(unsigned int n){
 int jl(unsigned int n){
     if (((reg[16] & 8) != 8) && ((reg[16] & 16) == 16)){
         reg[15] = n;
-        kolya = 0;
+        jumpPoint = n;
     }
     return 0;  
 }
@@ -1115,7 +1114,7 @@ int jl(unsigned int n){
 int jge(unsigned int n){
     if (((reg[16] & 8) == 8) || ((reg[16] & 16) != 16)){
         reg[15] = n;
-        kolya = 0;
+        jumpPoint = n;
     }
     return 0;
 }
@@ -1123,7 +1122,7 @@ int jge(unsigned int n){
 int jg(unsigned int n){
     if (((reg[16] & 8) != 8) && ((reg[16] & 16) != 16)){
         reg[15] = n;
-        kolya = 0;
+        jumpPoint = n;
     }
     return 0;  
 }
@@ -1166,6 +1165,10 @@ int store2(int r, unsigned n){
 }
  
 int loadr(int r1, int r2, int n){
+    if (reg[14]<=0) return 1;
+    reg[r1] = stek[reg[14]-1];// + n;
+    reg[14] --;
+    return 0;
     reg[r1] = memory[m_find(reg[r2] + n)];
     return 0;
 }
@@ -1199,6 +1202,12 @@ int debug () {
         printf("%d ", reg[i]);
     }
     printf("\n");
+    printf("stack: ");
+    for (i = 0; i < reg[14]; i++) {
+        printf("%d ", stek[i]);
+    }
+    printf("\n");
+    return 0;
 }
 
 
@@ -1212,10 +1221,11 @@ int interpreter(){
     fseek(inputs, 28 ,SEEK_SET);
     fscanf(inputs, "%c%c%c%c", &a, &b, &c, &d);
     start = (d << 24) + (c << 16) + (b << 8) + a;
+    reg[15] = start;
     fseek(inputs, 512 + (start * 4), SEEK_SET);
     //debug();
     while(fscanf(inputs,"%c%c%c%c", &a, &b, &c, &d) != EOF) {
-        kolya = 1;
+        jumpPoint = -1;
         switch(d){
             case HALT:
                 trans_bd(a, b, c, &un);
@@ -1406,7 +1416,7 @@ int interpreter(){
                 load2(r, un);
                 break;
             case STORE2:
-                trans_ri(a, b, c, &r, &un);
+                trans_rm(a, b, c, &r, &un);
                 store2(r, un);
                 break;
             case LOADR:
@@ -1429,8 +1439,12 @@ int interpreter(){
                 trans_bd(a, b, c, &un);
                 break;
         }
-        //debug();
-        //fseek(inputs, kolya*4, SEEK_CUR);
+        debug();
+        if (jumpPoint > -1) {
+            fseek(inputs, jumpPoint * 4 + 512, SEEK_SET);
+        } else {
+            reg[15]++;
+        }
     }
     return 0;
 }
