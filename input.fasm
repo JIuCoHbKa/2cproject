@@ -1,20 +1,24 @@
-sqr:                ;функция sqr с одним аргументом в стеке                                   0
-	loadr r0 r14 1  ;загрузка r0 ячейки с первым аргументом
-	mov r2 r0 0     ;копируем r0 в r2
-	mul r0 r2 0     ;(r0,r1) = r0*r2
-	ret 1           ;возвращаемся из функции, убрав аргумент из стека
-intout:             ;функция, распечатывающая аргумент + ’\n’                                 5
-	load r0 r14 1   ;загрузка первого аргумента в r0
-	syscall r0 102  ;вывод r0 на экран
-	lc r0 10        ;загрузка ’\n’
-	syscall r0 105  ;вывод ’\n’
-	ret 1           ;возврат
+fact:
+    loadr r0 r14 1
+    cmpi r0 1
+    jg skip0
+    lc r0 1
+    ret 1
+skip0:
+    push r0 0
+    subi r0 1
+    push r0 0
+    calli fact
+    pop r2 0
+    mul r0 r2 0
+    ret 1
 main:
-	syscall r0 100  ;считывание в r0
-	push r0 0       ;помещение r0+0 в стек
-	calli sqr       ;вызов функции sqr. В r0 функция оставит результат.
-	push r0 0       ;передаём результат в  фунцкию intout
-	calli intout    ;и вызываем её
-	lc r0 0
-	syscall r0 0    ;exit(0)
-end main
+    lc r0 4
+    push r0 0
+    calli fact
+    syscall r0 102
+    lc r0 10
+    syscall r0 105
+    lc r0 0
+    syscall r0 0
+    end main
