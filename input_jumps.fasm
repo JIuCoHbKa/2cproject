@@ -1,15 +1,21 @@
-    lc r7 2
-    lc r9 2
-    sub r7 r9 0
-    syscall r7 102
-    lc r0 10
-    syscall r0 105
-    sub r7 r9 100
-    syscall r7 102
-    syscall r0 105
-    subi r7 999
-    syscall r7 102
-    syscall r0 105
-    lc r0 0
-    syscall r0 0
-end 0
+loadr r0 r14 1
+cmpi r0 1
+jg 5
+lc r0 1
+ret 1
+push r0 0
+subi r0 1
+push r0 0
+calli 0
+pop r2 0
+mul r0 r2 0
+ret 1
+lc r0 4
+push r0 0
+calli 0
+syscall r0 102
+lc r0 10
+syscall r0 105
+lc r0 0
+syscall r0 0
+end 12

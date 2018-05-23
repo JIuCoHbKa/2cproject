@@ -304,15 +304,17 @@ int clearAsm() {
     FILE* inputJumps = fopen("input_jumps.fasm", "w");
  
     char line[100];
-    char* commandStek = malloc(100 * sizeof(char));
+    char commandStek[100];
     int lineNum = 0;
  	char c;
-
+    char prevc = 'q';
 	while (fscanf(input, "%c", &c) != EOF) {
-		fprintf(inputCleared, "%c", c);
+		if ((c != '\t') && !((prevc == ' ') && (c == ' ')))
+            fprintf(inputCleared, "%c", c);
 		//printf("%c", c);
 		if (c == ':') 
 			fprintf(inputCleared, "\n");
+		prevc = c;
 	}
 
 	fclose(inputCleared);
@@ -352,6 +354,12 @@ int clearAsm() {
         }
         commandStek[i] = '\0';
  
+        if (commandStek[0] == ' ') {
+        	for (j = 0; j < i; j++) {
+        		commandStek[j] = commandStek[j + 1];
+        	}
+        }
+
         if (i != 0) {
             if (line[i] != ':') {
                 char command[10];
