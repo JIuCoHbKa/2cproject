@@ -300,23 +300,32 @@ int * stek;
 unsigned int startCommand = 0;
 int clearAsm() {
     FILE* input = fopen("input.fasm", "r");
+    FILE* inputCleared = fopen("input_cleared.fasm", "w");
     FILE* inputJumps = fopen("input_jumps.fasm", "w");
  
     char line[100];
-    char commandStek[100];
+    char* commandStek = malloc(100 * sizeof(char));
     int lineNum = 0;
- 
-    while (fgets(line, 100, input) != NULL) {
+ 	char c;
+
+	while (fscanf(input, "%c", &c) != EOF) {
+		fprintf(inputCleared, "%c", c);
+		//printf("%c", c);
+		if (c == ':') 
+			fprintf(inputCleared, "\n");
+	}
+
+	fclose(inputCleared);
+	inputCleared = fopen("input_cleared.fasm", "r");
+
+    while (fgets(line, 100, inputCleared) != NULL) {
         int i = 0;
-        //printf("%s\n", line);
-        //int j;
+        
         while ((line[i] != '\n') && (line[i] != ';') && (line[i] != ':')) {
             commandStek[i] = line[i];
             i++;
         }
         commandStek[i] = '\0';
- 
-        //printf("%s %d\n", commandStek, i);
  
         if (i != 0) {
             if (line[i] == ':') {
@@ -332,9 +341,9 @@ int clearAsm() {
         }
     }
    
-    fseek(input, 0L, SEEK_SET);
+    fseek(inputCleared, 0L, SEEK_SET);
  
-    while (fgets(line, 100, input) != NULL) {
+    while (fgets(line, 100, inputCleared) != NULL) {
         int i = 0;
         int j;
         while ((line[i] != '\n') && (line[i] != ';') && (line[i] != ':')) {
@@ -342,7 +351,6 @@ int clearAsm() {
             i++;
         }
         commandStek[i] = '\0';
-        //printf("%s %d\n", commandStek, i);
  
         if (i != 0) {
             if (line[i] != ':') {
@@ -366,7 +374,9 @@ int clearAsm() {
         }
     }      
     fclose(input);
+    fclose(inputCleared);
     fclose(inputJumps);
+    free(labelsNums);
     return 0;
 }
  
@@ -458,7 +468,7 @@ int assembler() {
     fprintf(output, "%c%c%c%c", '\1', '\0', '\0', '\0'); // 4 byte
     for (i = 0; i < 476; i++)
         fprintf(output, "%c", '\0'); // up to 512 byte
-    //fseek(output, 512L, SEEK_SET);
+
     while (fscanf(input, "%[^\n]\n", line) != EOF) {
         char command[10];
         enum code commandCode;

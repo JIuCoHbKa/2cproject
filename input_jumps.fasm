@@ -1,21 +1,54 @@
-    loadr r0 r14 1
-    cmpi r0 1
-jg 5
-    lc r0 1
-    ret 1
-    push r0 0
-    subi r0 1
-    push r0 0
-calli 0
-    pop r2 0
-    mul r0 r2 0
-    ret 1
-    lc r0 4
-    push r0 0
-calli 0
-    syscall r0 102
+    lc r6 0 
+    lc r0 0 
+ cmpi r0 10
+jge 40
+    lc r1 0
+ cmpi r1 10
+jge 38
+    lc r2 0
+ cmpi r2 10
+jge 36
+    lc r3 0
+ cmpi r3 10
+jge 34
+    lc r4 0
+ cmpi r4 10
+jge 32
+    lc r5 0
+ cmpi r5 10
+jge 30
+    mov r7 r0 0
+    add r7 r1 0
+    add r7 r2 0
+    mov r8 r3 0
+    add r8 r4 0
+    add r8 r5 0
+    cmp r7 r8 0
+jne 28
+    addi r6 1
+ addi r5 1
+jmp 17
+ addi r4 1
+jmp 14
+ addi r3 1
+jmp 11
+ addi r2 1
+jmp 8
+ addi r1 1
+jmp 5
+ addi r0 1
+jmp 2
+ syscall r6 102
     lc r0 10
     syscall r0 105
     lc r0 0
     syscall r0 0
-end 12
+    syscall r0 100
+    addi r0 1
+    syscall r0  102
+    
+    
+    lc r1 10
+    syscall r1 105
+    syscall r1 0
+end 0
