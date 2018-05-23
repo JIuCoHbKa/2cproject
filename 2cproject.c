@@ -501,7 +501,7 @@ int m_pointer = 0;
 //int * stek;
  
 int trans_ri(char a, char b, char c, int* r, int* df){
-    *r = (c & 240);
+    *r = (c & 240) >> 4;
     *df = ((c & 15) << 16) + (b << 8) + a;
     return 0;
  
@@ -515,7 +515,7 @@ int trans_rr(char a, char b, char c, int* r, int* l, int* df){
     return 0;
 }
 int trans_rm(char a, char b, char c, int* r, unsigned* un){
-    *r = (c & 240);
+    *r = (c & 240) >> 4;
     *un = ((c&15)  << 16) + (b << 8) + a;
     return 0;
 }
@@ -982,8 +982,8 @@ int push(int r, int n){
  
 int pop(int r, int n){
     if (reg[14]<=0) return 1;
-    reg[r] = stek[reg[14]-1] + n;
     reg[14]--;
+    reg[r] = stek[reg[14]] + n;
     return 0;
 }
  
@@ -1005,7 +1005,8 @@ int calli(unsigned int n){
 }
  
 int ret(unsigned int n){
-    reg[15] = commandstek[CommandStekNumber - 1] + n;
+    reg[15] = commandstek[CommandStekNumber-1] + n;
+    CommandStekNumber--;
     jumpPoint = reg[15];
     return 0;
 }
@@ -1165,10 +1166,12 @@ int store2(int r, unsigned n){
 }
  
 int loadr(int r1, int r2, int n){
-    if (reg[14]<=0) return 1;
-    reg[r1] = stek[reg[14]-1];// + n;
-    reg[14] --;
-    return 0;
+    if (r2 == 14){
+        if (reg[14]<=0) return 1;
+        reg[14]-= n;
+        reg[r1] = stek[reg[14]];
+        return 0;
+    }   
     reg[r1] = memory[m_find(reg[r2] + n)];
     return 0;
 }
@@ -1206,6 +1209,12 @@ int debug () {
     for (i = 0; i < reg[14]; i++) {
         printf("%d ", stek[i]);
     }
+    printf("\n");
+    printf("comandstack: ");
+    for (i = 0; i < CommandStekNumber; i++) {
+        printf("%d ", commandstek[i]);
+    }
+
     printf("\n");
     return 0;
 }
@@ -1439,7 +1448,7 @@ int interpreter(){
                 trans_bd(a, b, c, &un);
                 break;
         }
-        debug();
+        //debug();
         if (jumpPoint > -1) {
             fseek(inputs, jumpPoint * 4 + 512, SEEK_SET);
         } else {
