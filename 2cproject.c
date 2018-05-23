@@ -306,10 +306,11 @@ int clearAsm() {
     char commandStek[100];
     int lineNum = 0;
  
-    while (fscanf(input, "%[^\n]\n", line) != EOF) {
+    while (fgets(line, 100, input) != NULL) {
         int i = 0;
+        //printf("%s\n", line);
         //int j;
-        while ((i < 100) && (line[i] != ';') && (line[i] != ':')) {
+        while ((line[i] != '\n') && (line[i] != ';') && (line[i] != ':')) {
             commandStek[i] = line[i];
             i++;
         }
@@ -333,10 +334,10 @@ int clearAsm() {
    
     fseek(input, 0L, SEEK_SET);
  
-    while (fscanf(input, "%[^\n]\n", line) != EOF) {
+    while (fgets(line, 100, input) != NULL) {
         int i = 0;
         int j;
-        while ((i < 100) && (line[i] != ';') && (line[i] != ':')) {
+        while ((line[i] != '\n') && (line[i] != ';') && (line[i] != ':')) {
             commandStek[i] = line[i];
             i++;
         }
