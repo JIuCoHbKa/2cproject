@@ -390,10 +390,11 @@ unsigned int rr(char* line) {
     sscanf (line, "%ms r%d r%d %hd", &command, &reg1, &reg2, &num);
     int commandCode = getCommandCode(command);
     unsigned int res;
+    unsigned int unum = num;
     res = commandCode << 24;
     res += reg1 << 20;
     res += reg2 << 16;
-    res += num;
+    res += unum;
     free(command);
     return res;
 }
@@ -404,11 +405,15 @@ unsigned int ri(char* line) {
     int num;
    
     sscanf (line, "%ms r%d %d", &command, &reg1, &num);
+
+    unsigned int ureg = reg1;
+    unsigned int unum = num;
+
     int commandCode = getCommandCode(command);
     unsigned int res;
     res = commandCode << 24;
-    res += reg1 << 20;
-    res += num & ((2 << 20) - 1);
+    res += ureg << 20;
+    res += unum & ((2 << 20) - 1);
     free(command);
     return res;
 }
@@ -435,7 +440,7 @@ unsigned int bd (char* line) {
     int commandCode = getCommandCode(command);
     unsigned int res;
     res = commandCode << 24;
-    res += num & ((2<<24) - 1);
+    res += num & ((2 << 24) - 1);
     free(command);
     return res;
 }
@@ -506,31 +511,51 @@ int assembler() {
  
  
 int reg[17];
-int * memory;
-int * memory2;
+int* memory;
+int* memory2;
 int m_pointer = 0;
 //int * stek;
+
+int m_find(int n){
+    int fd = 0;
+    int hg = 0;
+    while (n != memory2[fd] && fd < m_pointer){
+        fd++;
+        if (n == memory2[fd]) hg = fd;
+    }
+    return hg;
+}
+
+int m_add(int n, unsigned m) {
+	memory2[m_pointer] = n;
+	memory[m_pointer] = m;
+	m_pointer++;
+	return 0;
+}
  
-int trans_ri(char a, char b, char c, int* r, int* df){
-    *r = (c & 240) >> 4;
-    *df = ((c & 15) << 16) + (b << 8) + a;
+int trans_ri(unsigned char a, unsigned char b, unsigned char c, int* r, int* df){
+    unsigned int registrr = (c & 240) >> 4;
+    unsigned int data = ((c & 15) << 16) + (b << 8) + a;
+    *r = registrr;
+    *df = data;
+    //printf("                %d\n", *df);
     return 0;
  
 }
 
-int trans_rr(char a, char b, char c, int* r, int* l, int* df){
+int trans_rr(unsigned char a, unsigned char b, unsigned char c, int* r, int* l, int* df){
     *r = (c & 240) >> 4;
     *l = (c & 15);
     *df = (b << 8) + a;
     //printf("%d %d %d\n", *r, *l, *df);
     return 0;
 }
-int trans_rm(char a, char b, char c, int* r, unsigned* un){
+int trans_rm(unsigned char a, unsigned char b, unsigned char c, int* r, unsigned* un){
     *r = (c & 240) >> 4;
     *un = ((c&15)  << 16) + (b << 8) + a;
     return 0;
 }
-int trans_bd(char a, char b, char c, unsigned* un){
+int trans_bd(unsigned char a, unsigned char b, unsigned char c, unsigned* un){
     *un = (c << 16) + (b << 8) + a;
     return 0;
  
@@ -773,7 +798,7 @@ int addd(int r, int l, int df){
     unsigned long long l_int = ((l_l & 2097151) << 32) + l_1 + ((long long)1 << 54);
     if (r_deg > l_deg){
         while (l_deg != r_deg){
-            l_deg ++;
+            l_deg++;
             l_int >>= 1;
             if (l_int == 0){
                 return 0;
@@ -782,7 +807,7 @@ int addd(int r, int l, int df){
     }
     else {
         while (l_deg != r_deg){
-            r_deg ++;
+            r_deg++;
             r_int >>= 1;
             if (r_int == 0){
                 if (((r_sign) ^ (l_sign)) == 1) {
@@ -835,7 +860,7 @@ int subd(int r, int l, int df){ //не работает на разных зна
     unsigned long long l_int = ((l_l & 2097151) << 32) + l_1 + ((long long)1 << 54);
     if (r_deg > l_deg){
         while (l_deg != r_deg){
-            l_deg ++;
+            l_deg++;
             l_int >>= 1;
             if (l_int == 0){
                 return 0;
@@ -844,7 +869,7 @@ int subd(int r, int l, int df){ //не работает на разных зна
     }
     else {
         while (l_deg != r_deg){
-            r_deg ++;
+            r_deg++;
             r_int >>= 1;
             if (r_int == 0){
                 if (((r_sign) ^ (l_sign)) == 1) {
@@ -986,15 +1011,14 @@ int dtoi(int r, int l, int n){
 }
  
 int push(int r, int n){
-    stek[reg[14]] = reg[r] + n;
-    reg[14]++;
+	m_add(reg[14], reg[r] + n);
+    reg[14]--;
     return 0;
 }
  
 int pop(int r, int n){
-    if (reg[14]<=0) return 1;
-    reg[14]--;
-    reg[r] = stek[reg[14]] + n;
+    reg[r] = memory[m_find(reg[14])] + n;
+    reg[14]++;
     return 0;
 }
  
@@ -1138,21 +1162,11 @@ int jg(unsigned int n){
     }
     return 0;  
 }
-int m_find(int n){
-    int fd = 0;
-    int hg = 0;
-    while (n != memory2[fd] && fd < m_pointer){
-        fd ++;
-        if (n == memory2[fd]) hg = fd;
-    }
-    return hg;
-}
 
- 
 int store(int r, unsigned n){
     memory[m_pointer] = reg[r];
     memory2[m_pointer] = n;
-    m_pointer ++;
+    m_pointer++;
     return 0;
 }
  
@@ -1170,27 +1184,21 @@ int load2(int r, unsigned n){
 int store2(int r, unsigned n){
     memory[m_pointer] = reg[r];
     memory2[m_pointer] = n;
-    m_pointer ++;
+    m_pointer++;
     memory[m_pointer] = reg[r+1];
     memory2[m_pointer] = n+1;
     return 0;
 }
  
 int loadr(int r1, int r2, int n){
-    if (r2 == 14){
-        if (reg[14]<=0) return 1;
-        reg[14]-= n;
-        reg[r1] = stek[reg[14]];
-        return 0;
-    }   
-    reg[r1] = memory[m_find(reg[r2] + n)];
+    reg[r1] = memory[reg[r2] + n];
     return 0;
 }
  
 int storer(int r1, int r2, int n){
     memory[m_pointer] = reg[r1];
     memory2[m_pointer] = n + reg[r2];
-    m_pointer ++;
+    m_pointer++;
     return 0;
 }
  
@@ -1203,7 +1211,7 @@ int loadr2(int r1, int r2, int n){
 int storer2(int r1, int r2, int n){
     memory[m_pointer] = reg[r1];
     memory2[m_pointer] = n + reg[r2];
-    m_pointer ++;
+    m_pointer++;
     memory[m_pointer] = reg[r1 + 1];
     memory2[m_pointer] = n + reg[r2] + 1;
     return 0;
@@ -1215,17 +1223,7 @@ int debug () {
     for (i = 0; i < 17; i++) {
         printf("%d ", reg[i]);
     }
-    printf("\n");
-    printf("stack: ");
-    for (i = 0; i < reg[14]; i++) {
-        printf("%d ", stek[i]);
-    }
-    printf("\n");
-    printf("comandstack: ");
-    for (i = 0; i < CommandStekNumber; i++) {
-        printf("%d ", commandstek[i]);
-    }
-
+    
     printf("\n");
     return 0;
 }
@@ -1475,6 +1473,7 @@ int main(){
     for (i = 0; i < 17; i++) {
         reg[i] = 0;
     }
+    reg[14] = 1048575;
     stek = malloc(sizeof(int) * 1024);
     memory = malloc(sizeof(int) * 622144);
     memory2 = malloc(sizeof(int) * 622144);
