@@ -4,7 +4,10 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
- 
+
+int debugMode;
+
+
 FILE * inputs;
  
 enum code {
@@ -1500,7 +1503,9 @@ int interpreter(){
                 trans_bd(a, b, c, &un);
                 break;
         }
-        //debug();
+        if (debugMode) {
+        	debug();
+        }
         if (jumpPoint > -1) {
             fseek(inputs, jumpPoint * 4 + 512, SEEK_SET);
         } else {
@@ -1510,8 +1515,13 @@ int interpreter(){
     return 0;
 }
 
-
-int main(){
+int main(int argc, char const *argv[]){
+	debugMode = 0;
+	if (argc > 1) {
+		if (!strcmp(argv[1], "--debug")) {
+			debugMode = 1;
+		}
+	}
     int i;
     for (i = 0; i < 17; i++) {
         reg[i] = 0;
