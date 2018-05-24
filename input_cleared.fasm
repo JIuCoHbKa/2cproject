@@ -25,4 +25,3 @@ main:
  lc r0 0
  syscall r0 0
  end main
-

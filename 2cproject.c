@@ -522,30 +522,55 @@ int reg[17];
 int* memory;
 int* memory2;
 int m_pointer = 0;
-//int * stek;
 
-int m_find(int n){
-    int fd = 0;
-    int hg = 0;
-    while (n != memory2[fd] && fd < m_pointer){
-        fd++;
-        if (n == memory2[fd]) hg = fd;
+int freeDataInMemory (int n) {
+	int i = 0;
+	int j;
+	while ((i < m_pointer) && (memory2[i] != n)) {
+    	i++;
     }
-    return hg;
+    if (i < m_pointer) {
+    	for (j = i; j < m_pointer - 1; j++) {
+    		memory2[j] = memory2[j + 1];
+    		memory[j] = memory[j + 1];
+    	}
+    	m_pointer--;
+    } else {
+    	return -1;
+    }
+    return 0;
 }
 
-int m_add(int n, unsigned m) {
-	memory2[m_pointer] = n;
-	memory[m_pointer] = m;
-	m_pointer++;
-	return 0;
+int getDataFromMemory (int n) {
+	int i = 0;
+    while ((i < m_pointer) && (memory2[i] != n)) {
+    	i++;
+    }
+    if (i < m_pointer) {
+    	return memory[i];
+    } else {
+    	return -1;
+    }
+}
+
+int setDataToMemory (int n, unsigned m) {
+	int i = 0;
+	while ((i < m_pointer) && (memory2[i] != n)) {
+    	i++;
+    }
+    if (i < m_pointer) {
+    	memory[i] = m;
+    } else {
+    	memory[m_pointer] = m;
+    	memory2[m_pointer] = n;
+    	m_pointer++;
+    }
+    return 0;
 }
  
 int trans_ri(unsigned char a, unsigned char b, unsigned char c, int* r, int* df){
-    unsigned int registrr = (c & 240) >> 4;
-    unsigned int data = ((c & 15) << 16) + (b << 8) + a;
-    *r = registrr;
-    *df = data;
+    *r = (c & 240) >> 4;
+    *df = ((c & 15) << 16) + (b << 8) + a;
     //printf("                %d\n", *df);
     return 0;
  
@@ -1017,39 +1042,41 @@ int dtoi(int r, int l, int n){
     reg[r] = (int)((l_sign << 31) + (l_int >> (23 + 32 - 511 + l_deg)));
     return 0;
 }
- 
+
 int push(int r, int n){
-	m_add(reg[14], reg[r] + n);
-    reg[14]--;
+	reg[14]--;
+	setDataToMemory(reg[14], reg[r] + n);
     return 0;
 }
  
 int pop(int r, int n){
-    reg[r] = memory[m_find(reg[14])] + n;
+    reg[r] = getDataFromMemory(reg[14]) + n;
     reg[14]++;
     return 0;
 }
- 
-int call(int r, int l, int n){
-    commandstek[CommandStekNumber] = reg[15];
-    CommandStekNumber++;
-    reg[r] = reg[15];
+
+
+int call(int r, int l, int n) {
+    push(15, 1);
+    reg[r] = reg[15] + 1;
     reg[15] = reg[l] + n;
     jumpPoint = reg[15];
     return 0;
 }
  
 int calli(unsigned int n){
-    commandstek[CommandStekNumber] = reg[15];
-    CommandStekNumber++;
+    push(15, 1);
     reg[15] = n;
     jumpPoint = n;
     return 0;
 }
  
 int ret(unsigned int n){
-    reg[15] = commandstek[CommandStekNumber-1] + n;
-    CommandStekNumber--;
+	int i;
+	pop(15, 0);
+	for (i = 0; i < n; i++) {
+		reg[14]++;
+	}
     jumpPoint = reg[15];
     return 0;
 }
@@ -1163,33 +1190,33 @@ int jge(unsigned int n){
     return 0;
 }
  
-int jg(unsigned int n){
-    if (((reg[16] & 8) != 8) && ((reg[16] & 16) != 16)){
+int jg(unsigned int n) {
+    if (((reg[16] & 8) != 8) && ((reg[16] & 16) != 16)) {
         reg[15] = n;
         jumpPoint = n;
     }
     return 0;  
 }
 
-int store(int r, unsigned n){
+int store(int r, unsigned n) {
     memory[m_pointer] = reg[r];
     memory2[m_pointer] = n;
     m_pointer++;
     return 0;
 }
  
-int load (int r, unsigned n){
-    reg[r] = memory[m_find(n)];
+int load (int r, unsigned n) {
+    reg[r] = getDataFromMemory(n);
     return 0;
 }
  
-int load2(int r, unsigned n){
-    reg[r] = memory[m_find(n)];
-    reg[r+1] = memory[m_find(n)+1];
+int load2(int r, unsigned n) {
+    reg[r] = getDataFromMemory(n);
+    reg[r+1] = getDataFromMemory(n+1);
     return 0;
 }
  
-int store2(int r, unsigned n){
+int store2(int r, unsigned n) {
     memory[m_pointer] = reg[r];
     memory2[m_pointer] = n;
     m_pointer++;
@@ -1198,21 +1225,21 @@ int store2(int r, unsigned n){
     return 0;
 }
  
-int loadr(int r1, int r2, int n){
-    reg[r1] = memory[reg[r2] + n];
+int loadr(int r1, int r2, int n) {
+    reg[r1] = getDataFromMemory(reg[r2] + n);
     return 0;
 }
  
-int storer(int r1, int r2, int n){
+int storer(int r1, int r2, int n) {
     memory[m_pointer] = reg[r1];
     memory2[m_pointer] = n + reg[r2];
     m_pointer++;
     return 0;
 }
  
-int loadr2(int r1, int r2, int n){
-    reg[r1] = memory[m_find(n + reg[r2])];
-    reg[r1+1] = memory[m_find(n + reg[r2])+1];
+int loadr2(int r1, int r2, int n) {
+    reg[r1] = getDataFromMemory(n + reg[r2]);
+    reg[r1+1] = getDataFromMemory(n + reg[r2] + 1);
     return 0;
 }
  
@@ -1231,8 +1258,17 @@ int debug () {
     for (i = 0; i < 17; i++) {
         printf("%d ", reg[i]);
     }
-    
+    /*printf("\nmemory: ");
+    for (i = 0; i < m_pointer; i++) {
+    	printf("[%d:%d] ", memory2[i], memory[i]);
+    }*/
+    printf("\nstack: ");
+    for (i = reg[14]; i < 1048575; i++) {
+    	printf("[[%d]] ", getDataFromMemory(i));
+    }
     printf("\n");
+    
+    //printf("\nstack pointer: %d\n", jumpPoint);
     return 0;
 }
 
@@ -1249,7 +1285,6 @@ int interpreter(){
     start = (d << 24) + (c << 16) + (b << 8) + a;
     reg[15] = start;
     fseek(inputs, 512 + (start * 4), SEEK_SET);
-    //debug();
     while(fscanf(inputs,"%c%c%c%c", &a, &b, &c, &d) != EOF) {
         jumpPoint = -1;
         switch(d){
@@ -1485,6 +1520,7 @@ int main(){
     stek = malloc(sizeof(int) * 1024);
     memory = malloc(sizeof(int) * 622144);
     memory2 = malloc(sizeof(int) * 622144);
+    m_pointer = 0;
     commandstek = malloc(sizeof(int) * 1024);
     clearAsm();
     assembler();
