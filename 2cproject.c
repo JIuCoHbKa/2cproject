@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 
 int debugMode;
 
@@ -71,6 +72,38 @@ enum type {
     RM = 2,
     BD = 3
 };
+
+union DoubleMagic {
+	double d;
+	uint64_t u64;
+};
+
+
+double andDoubleWithInt(double d, int b) {
+	union DoubleMagic dm;
+	dm.d = d;
+	dm.u64 &= b;
+	return dm.d;
+}
+
+double bitMove(double d, int b) {
+	union DoubleMagic dm;
+	dm.d = d;
+	dm.u64 = dm.u64 >> b;
+	return dm.d;
+}
+
+uint64_t doubleAsInt (double d) {
+	union DoubleMagic dm;
+	dm.d = d;
+	return dm.u64;
+}
+
+double intAsDouble (uint64_t u64) {
+	union DoubleMagic dm;
+	dm.u64 = u64;
+	return dm.d;
+}
  
 enum code getCommandCode (char* commandName) {
     char command;
@@ -367,9 +400,10 @@ int clearAsm() {
             if (line[i] != ':') {
                 char command[10];
                 char second[10];
-                sscanf(commandStek, "%s %s", command, second);
+                char third[10];
+                sscanf(commandStek, "%s %s %s", command, second, third);
                 int commandCode = getCommandCode(command);
-                if (((commandCode >= 46) && (commandCode <= 52)) || !strcmp(command, "end") || !strcmp(command, "call") || !strcmp(command, "calli")) {
+                if (((commandCode >= 46) && (commandCode <= 52)) || !strcmp(command, "end") || !strcmp(command, "calli")) {
                     for (j = 0; j < labelsCount; j++) {
                         if (!strcmp(labels[j], second)) {
                             fprintf(inputJumps, "%s %d\n", command, labelsNums[j]);
@@ -378,6 +412,17 @@ int clearAsm() {
                             break;
                         }
                     }
+                } else if (!strcmp(command, "lc")) {
+                	int number = atoi(third);
+                	if ((number == 0) && (third[0] != '0')){
+                		for (j = 0; j < labelsCount; j++) {
+	                        if (!strcmp(labels[j], third)) {
+	                            fprintf(inputJumps, "%s %s %d\n", command, second, labelsNums[j]);
+	                        }
+                    	}
+                	} else {
+                		fprintf(inputJumps, "%s\n", commandStek);	
+                	}
                 } else {
                     fprintf(inputJumps, "%s\n", commandStek);
                 }
@@ -604,6 +649,8 @@ int syscall_fupm(int r, int df){
     int t = 1;
     int k = 0;
     char name[260];
+    double scanned;
+    uint64_t forPrint;
     //void * buf;
     //int len;
     switch (df){
@@ -697,13 +744,18 @@ int syscall_fupm(int r, int df){
             scanf("%d", &reg[r]);
             break;
         case 101: 
-            scanf("%d%d", &reg[r], &reg[r+1]);
+        	scanf("%lf", &scanned);
+            uint64_t scanned2 = doubleAsInt(scanned);
+            reg[r] = scanned2 >> 32;
+            reg[r + 1] = scanned2 % 4294967296;
             break;
         case 102: 
             printf("%d", reg[r]);
             break;
         case 103: 
-            printf("%d%d", reg[r], reg[r+1]);
+        	forPrint = reg[r] * 4294967296 + reg[r + 1];
+        	double forPrint2 = intAsDouble(forPrint);
+            printf("%g", forPrint2);
             break;
         case 104: 
             reg[r] = getchar();
@@ -735,19 +787,22 @@ int subi(int r, int df){
     reg[r] -= df;
     return 0;
 }
+
 int mul(int r, int l, int df){
-    int first = reg[r];
-    int second = reg[l];
+    long long int first = reg[r];
+    long long int second = reg[l];
     long long var = first * second;
-    reg[r + 1] = (int)(var >> 32);
-    reg[r] = (int)(var & 4294967295);
+    //printf("%lld\n", var);
+    reg[r + 1] = var / 4294967296;
+    reg[r] = var % 4294967296;
     return 0;
 }
 int muli(int r, int df){
-    int first = reg[r];
+    long long int first = reg[r];
     long long var = first * df;
-    reg[r + 1] = (int)(var >> 32);
-    reg[r] = (int)(var & 4294967295);
+    reg[r + 1] = var / 4294967296;
+    //printf("%d\n", var / 4294967296);
+    reg[r] = var % 4294967296;
     return 0;
 }
 int divn(int r, int l, int df){
@@ -822,189 +877,47 @@ int mov(int r, int l, int df){
     return 0;
 }
 int addd(int r, int l, int df){
-    int r_deg = ((reg[r] >> 21) & 1023);
-    int l_deg = ((reg[r] >> 21) & 1023);
-    unsigned long r_l = (unsigned long)(reg[r]);
-    unsigned long r_1 = (unsigned long)(reg[r + 1]);
-    unsigned long l_1 = (unsigned long)(reg[l + 1]);
-    unsigned long l_l = (unsigned long)(reg[l]);
-    char r_sign = (reg[r] >> 31);
-    char l_sign = (reg[l] >> 31);
-    unsigned long long r_int = ((r_l & 2097151) << 32) + r_1 + ((long long)1 << 54);
-    unsigned long long l_int = ((l_l & 2097151) << 32) + l_1 + ((long long)1 << 54);
-    if (r_deg > l_deg){
-        while (l_deg != r_deg){
-            l_deg++;
-            l_int >>= 1;
-            if (l_int == 0){
-                return 0;
-            }
-        }
-    }
-    else {
-        while (l_deg != r_deg){
-            r_deg++;
-            r_int >>= 1;
-            if (r_int == 0){
-                if (((r_sign) ^ (l_sign)) == 1) {
-                    reg[r] = reg[l];
-                    reg[r + 1] = reg[l + 1];
-                    return 0;
-                }
-                else {
-                    reg[r] = reg[l] ^ (1 << 31);
-                    reg[r + 1] = reg[l + 1];
- 
-                }
-            }
-        }
-    }
-    if (((r_sign) ^ (l_sign)) == 0) {
-        r_int += l_int;
-    }
-    else {
-        if (r_int > l_int){
-            r_int -= l_int;
-        }
-        else {
-            r_int = l_int - r_int;
-            r_sign = l_sign;
-        }
-    }
-    r_deg += 10; //не уверен
-    while ((r_int >> 63)!=1){
-        r_int <<= 1;
-        r_deg --;
-    }
-    r_int <<= 1;
-    r_deg --;
- 
-    reg[r]=(int)((r_sign << 31) + (r_deg << 21) + ((r_int & 2097151) >> 43));  //Поменял немного скобки вроде на правильные
-    reg[r + 1] = (int)(r_int >> 11);
+    uint64_t first = reg[r] * 4294967296 + reg[r + 1];
+    double firstd = intAsDouble(first);
+    uint64_t second = reg[l] * 4294967296 + reg[l + 1];
+    double secondd = intAsDouble(second);
+    double resultd = firstd + secondd;
+    uint64_t result = doubleAsInt(resultd);
+    reg[r] = result / 4294967296;
+    reg[r + 1] = result % 4294967296;        
     return 0;
 }
-int subd(int r, int l, int df){ //не работает на разных знаках пока как и сложение.
-    int r_deg = ((reg[r] >> 21) & 1023);
-    int l_deg = ((reg[r] >> 21) & 1023);
-    unsigned long r_l = (unsigned long)(reg[r]);
-    unsigned long r_1 = (unsigned long)(reg[r + 1]);
-    unsigned long l_1 = (unsigned long)(reg[l + 1]);
-    unsigned long l_l = (unsigned long)(reg[l]);
-    char r_sign = (reg[r] >> 31);
-    char l_sign = (reg[l] >> 31);
-    unsigned long long r_int = ((r_l & 2097151) << 32) + r_1 + ((long long)1 << 54);
-    unsigned long long l_int = ((l_l & 2097151) << 32) + l_1 + ((long long)1 << 54);
-    if (r_deg > l_deg){
-        while (l_deg != r_deg){
-            l_deg++;
-            l_int >>= 1;
-            if (l_int == 0){
-                return 0;
-            }
-        }
-    }
-    else {
-        while (l_deg != r_deg){
-            r_deg++;
-            r_int >>= 1;
-            if (r_int == 0){
-                if (((r_sign) ^ (l_sign)) == 1) {
-                    reg[r] = reg[l];
-                    reg[r + 1] = reg[l + 1];
-                    return 0;
-                }
-                else {
-                    reg[r] = reg[l] ^ (1 << 31);
-                    reg[r + 1] = reg[l + 1];
- 
-                }
-            }
-        }
-    }
-    if (((r_sign) ^ (l_sign)) == 1) {
-        r_int += l_int;
-    }
-    else {
-        if (r_int > l_int){
-            r_int -= l_int;
-        }
-        else {
-            r_int = l_int - r_int;
-            r_sign = l_sign;
-        }
-    }
-    r_deg += 10; //не уверен
-    while ((r_int >> 63)!=1){
-        r_int <<= 1;
-        r_deg --;
-    }
-    r_int <<= 1;
-    r_deg --;
- 
-    reg[r]=(int)((r_sign << 31) + (r_deg << 21) + ((r_int & 2097151) >> 43));
-    reg[r + 1] = (int)(r_int >> 11);
+int subd(int r, int l, int df){
+	uint64_t first = reg[r] * 4294967296 + reg[r + 1];
+    double firstd = intAsDouble(first);
+    uint64_t second = reg[l] * 4294967296 + reg[l + 1];
+    double secondd = intAsDouble(second);
+    double resultd = firstd - secondd;
+    uint64_t result = doubleAsInt(resultd);
+    reg[r] = result / 4294967296;
+    reg[r + 1] = result % 4294967296;  
     return 0;
 }
 int muld(int r, int l, int df){
-    int r_deg = ((reg[r] >> 21) & 1023);
-    int l_deg = ((reg[r] >> 21) & 1023);
-    char r_sign = (reg[r] >> 31);
-    char l_sign = (reg[l] >> 31);
-    int r_int = (reg[r] & 2097151) + (1 << 22);
-    int r_int1 = reg[r + 1];
-    int l_int = (reg[l] & 2097151) + (1 << 22);
-    int l_int1 = reg[l + 1];
-    unsigned long long res_1 = r_int * l_int;
-    unsigned long long res_2 = r_int * l_int1;
-    unsigned long long res_3 = r_int1 * l_int;
-    unsigned long long res_4 = ((long long)r_int1 * (long long)l_int1) >> 32;
-    unsigned long long res_5 = res_4 + res_3;
-    int m, n;
-    if (res_5 < res_4 || res_5 < res_3) {m = 1;}
-    else {m = 0;}
-    unsigned long long res_6 = res_5 + res_2;
-    if (res_5 < res_4 || res_5 < res_3) {n = 1;}
-    else {n = 0;}
-    unsigned long long res_7 = (res_6 >> 32)+ n + m + res_1;
-    int f = 63;
-    while (((1 << f) & res_7) == 0){
-        f--;
-    }
-    f--;
-    r_sign = r_sign ^ l_sign;
-    r_deg += l_deg;
-    r_deg &= 1024;
-    reg[r] = (int)((r_sign << 31) + (r_deg << 21) + (res_7 >> (41 -f-64 + 2*f)));
-    reg[r+1] = (int)(res_7 >> (11 - f-64 + 2*f));
+    uint64_t first = reg[r] * 4294967296 + reg[r + 1];
+    double firstd = intAsDouble(first);
+    uint64_t second = reg[l] * 4294967296 + reg[l + 1];
+    double secondd = intAsDouble(second);
+    double resultd = firstd * secondd;
+    uint64_t result = doubleAsInt(resultd);
+    reg[r] = result / 4294967296;
+    reg[r + 1] = result % 4294967296;  
     return 0;
 }
 int divd(int r, int l, int df){
-    int r_deg = ((reg[r] >> 21) & 1023);
-    int l_deg = ((reg[r] >> 21) & 1023);
-    unsigned long r_l = (unsigned long)(reg[r]);
-    unsigned long r_1 = (unsigned long)(reg[r + 1]);
-    unsigned long l_1 = (unsigned long)(reg[l + 1]);
-    unsigned long l_l = (unsigned long)(reg[l]);
-    char r_sign = (reg[r] >> 31);
-    char l_sign = (reg[l] >> 31);
-    unsigned long long r_int = ((r_l & 2097151) << 32) + r_1 + ((long long)1 << 54);
-    unsigned long long l_int = ((l_l & 2097151) << 32) + l_1 + ((long long)1 << 54);
-    unsigned long long res = r_int/l_int;
-    r_int /= l_int;
-    int f = 63;
-    while (((1 << f) & res) == 0){
-        f--;
-    }
-    while (f < 52){
-        f++;
-        r_int <<= 1;
-        res <<= 1;
-        r_deg -=1;
-        res +=(r_int/l_int);
-    }
-    if ((r_sign ^ l_sign)==1) r_sign =1;
-    reg[r]=(int)((r_sign << 31) + ((r_deg - l_deg) << 21) + (((r_int & 2097151) >> 43)));
-    reg[r + 1] =(int)(r_int >> 11);
+    uint64_t first = reg[r] * 4294967296 + reg[r + 1];
+    double firstd = intAsDouble(first);
+    uint64_t second = reg[l] * 4294967296 + reg[l + 1];
+    double secondd = intAsDouble(second);
+    double resultd = firstd / secondd;
+    uint64_t result = doubleAsInt(resultd);
+    reg[r] = result / 4294967296;
+    reg[r + 1] = result % 4294967296;  
     return 0;
 }
  
@@ -1016,18 +929,12 @@ int CommandStekNumber = 0;
 int jumpPoint = -1;
 
 int itod(int r, int l, int n){
-    int r_sign;
-    if (reg[r]< 0) r_sign = 1;
-    else r_sign = 0;
-    int r_deg = 31;
-    unsigned r_body = reg[l] & (((unsigned)1 << 31) - 1);
-    while ((r_body >> 31) !=0){
-        r_deg --;
-        r_body <<= 1;
-    }
-    unsigned long long r_int = (r_body << 23);
-    reg[r]=(int)((r_sign << 31) + (r_deg << 21) + (((r_int & 2097151) >> 43)));
-    reg[r + 1] =(int)(r_int >> 11);
+    double d = (double) reg[l] + n;
+    uint64_t d2 = doubleAsInt(d);
+    int big = d2 >> 32;
+    int less = d2 % 4294967296;
+    reg[r] = big;
+    reg[r+1] = less;
     return 0;
 }
  
@@ -1061,8 +968,9 @@ int pop(int r, int n){
 
 int call(int r, int l, int n) {
     push(15, 1);
-    reg[r] = reg[15] + 1;
+    int x = reg[15];
     reg[15] = reg[l] + n;
+    reg[r] = x + 1;
     jumpPoint = reg[15];
     return 0;
 }

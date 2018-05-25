@@ -14,6 +14,7 @@ lc r3 31415
 lc r4 271828
 mul r3 r4 0
 calli 4
-lc r5 print34
+lc r5 4
+call r5 r5 0
 calli 10
 end 12
